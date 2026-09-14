@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Consultation — {{ patient.numero_dossier }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-1">Consultation médicale</h1>
+<p class="text-secondary">{{ patient.nom }} {{ patient.prenom }} · {{ patient.numero_dossier }}</p>
+{% if patient.allergies %}
+  <div class="alert alert-danger">Allergies : {{ patient.allergies }}</div>
+{% endif %}
+<form method="post" class="card stat-card card-body" novalidate>
+  {% csrf_token %}
+  {% for field in form %}
+    <div class="mb-3">
+      <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+    </div>
+  {% endfor %}
+  <button class="btn btn-success" type="submit">
+    {% if is_medecin_role %}Enregistrer puis rédiger l'ordonnance{% else %}Enregistrer la consultation{% endif %}
+  </button>
+  <a class="btn btn-outline-secondary" href="{{ patient.get_absolute_url }}">Annuler</a>
+</form>
+{% endblock %}

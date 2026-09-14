@@ -1,0 +1,608 @@
+EXPLICATION DU CODE — Poste de Santé Khar Yalla
+================================================
+Fichier d’aide pour comprendre le projet et l’expliquer à l’oral.
+Ouvre-le à côté de Cursor / VS Code. Tu n’as pas besoin d’apprendre
+les migrations (fichiers 0001, 0002) par cœur : Django les génère.
+
+
+1. COMMENT LE PROJET EST ORGANISÉ
+---------------------------------
+Django découpe le site en « applis » :
+
+  health_centre/     réglages globaux (settings, urls racine)
+  accounts/          connexion, utilisateurs, photo, audit
+  patients/          dossiers patients
+  consultations/     constantes, consultations, ordonnances, RDV
+  reports/           tableau de bord
+  templates/         pages HTML
+  static/css/app.css couleurs et mise en page
+
+Le personnel ouvre le navigateur → Django reçoit l’URL → urls.py
+choisit une vue → la vue lit/écrit la base (models) → un template HTML
+est renvoyé.
+
+Les Class-Based Views (CreateView, ListView…) évitent de réécrire
+à la main le CRUD. On surcharge seulement ce qui est spécial
+(form_valid, get_queryset, etc.).
+
+
+2. VOCABULAIRE UTILE À L’ORAL
+-----------------------------
+Model        table en base (Patient, User…)
+Field        colonne (nom, date_naissance…)
+FK           ForeignKey = lien vers une autre table
+OneToOne     un pour un (une ordonnance par consultation)
+Mixin        petit bout de classe qu’on « mixe » pour les droits
+CBV          vue en classe (ListView, CreateView…)
+csrf_token   jeton anti-falsification de formulaire
+icontains    recherche « contient », sans tenir compte des majuscules
+select_related   jointure SQL pour éviter trop de requêtes
+
+
+3. manage.py
+------------
+Ligne shebang : sous Linux ça permet de lancer le fichier comme un script.
+import os, sys : modules Python de base.
+
+def main():
+  setdefault("DJANGO_SETTINGS_MODULE", "health_centre.settings")
+    → Django sait quel fichier de config charger.
+  try/except ImportError
+    → message clair si Django n’est pas installé (venv oublié).
+  execute_from_command_line(sys.argv)
+    → exécute la commande tapée : runserver, migrate, seed_data…
+
+if __name__ == "__main__":
+  main()
+    → ce bloc ne tourne que si on lance « python manage.py … »
+      (pas si un autre fichier importe manage.py).
+
+
+4. health_centre/settings.py
+----------------------------
+from pathlib import Path
+  Path sert à construire des chemins Windows/Linux sans se tromper.
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+  __file__ = ce fichier settings.py
+  .parent = dossier health_centre/
+  .parent.parent = racine du projet (là où est manage.py)
+
+SECRET_KEY
+  Django s’en sert pour signer les cookies. En démo elle est fixe.
+  En vrai déploiement on la met dans une variable d’environnement.
+
+DEBUG = True
+  affiche les erreurs détaillées. En production on met False.
+
+ALLOWED_HOSTS = ["*"]
+  n’importe quel nom d’hôte est accepté (pratique en LAN).
+  En ligne on mettrait le vrai nom de domaine.
+
+NOM_STRUCTURE
+  texte affiché dans le menu et la page de connexion.
+
+INSTALLED_APPS
+  liste des applis actives. django.contrib.* = pièces fournies
+  par Django (admin, auth, sessions…). Ensuite nos 4 applis.
+
+MIDDLEWARE
+  filtres qui s’exécutent à CHAQUE requête, dans l’ordre.
+  CsrfViewMiddleware : refuse un POST sans jeton.
+  AuthenticationMiddleware : remplit request.user.
+  AuditMiddleware : notre journal des commandes.
+
+ROOT_URLCONF = "health_centre.urls"
+  fichier des URLs de départ.
+
+TEMPLATES
+  BACKEND DjangoTemplates
+  DIRS = templates/ à la racine (base.html, login…)
+  APP_DIRS = True : Django cherche aussi templates/ dans chaque appli
+  context_processors : variables injectées dans TOUTES les pages
+    request, user, messages, role_flags, NOM_STRUCTURE, media
+
+DATABASES sqlite3
+  un fichier db.sqlite3. Pas besoin de MySQL/Postgres en local.
+
+AUTH_USER_MODEL = "accounts.User"
+  on n’utilise pas le User par défaut, le nôtre a un rôle et une photo.
+  À déclarer AVANT la première migrate.
+
+AUTH_PASSWORD_VALIDATORS
+  règles de mot de passe (longueur, trop simple, etc.).
+
+LANGUAGE_CODE / TIME_ZONE
+  dates en français, fuseau Afrique (Abidjan = UTC+0, courant en Afrique de l’Ouest).
+
+STATIC_URL / STATICFILES_DIRS
+  CSS, images du projet (pas les photos uploadées).
+
+MEDIA_URL / MEDIA_ROOT
+  fichiers envoyés par les utilisateurs (photos de profil).
+
+LOGIN_URL / LOGIN_REDIRECT_URL / LOGOUT_REDIRECT_URL
+  où envoyer quelqu’un s’il n’est pas connecté, après login, après logout.
+
+SESSION_COOKIE_AGE = 8 h
+  la session expire au bout d’à peu près une vacation.
+
+CSRF_TRUSTED_ORIGINS
+  origines autorisées pour les POST. Si on ouvre l’app via une IP LAN
+  (http://192.168.x.x:8000) il faudra l’ajouter ici.
+
+MESSAGE_TAGS
+  Django dit « error », Bootstrap dit « danger » : on fait le pont.
+
+
+5. health_centre/urls.py
+------------------------
+include("accounts.urls") : tout ce qui commence par /comptes/ va dans accounts.
+path("", include("reports.urls")) : l’URL vide / = dashboard.
+
+handler403 : si PermissionDenied, Django affiche templates/403.html.
+
+if settings.DEBUG: static(MEDIA…)
+  en développement Django sert les photos. En production c’est Nginx.
+
+
+6. health_centre/wsgi.py et asgi.py
+-----------------------------------
+wsgi.py : point d’entrée pour Gunicorn (serveur « vrai »).
+asgi.py : variante async, on ne s’en sert pas en local.
+Les deux lignes importantes :
+  os.environ.setdefault(...)  même settings
+  application = get_wsgi_application()  objet que le serveur appelle
+
+
+7. accounts/models.py
+---------------------
+photo_upload_to(instance, filename)
+  Django appelle ça quand on enregistre une photo.
+  On récupère l’extension (.jpg, .png) et on range dans media/photos/identifiant.ext
+
+class User(AbstractUser)
+  AbstractUser = déjà username, password, email, is_staff…
+  On ajoute seulement ce qui nous manque.
+
+  class Role(TextChoices)
+    les 4 rôles. La valeur en base = "MEDECIN", l’affichage = "Médecin".
+
+  ROLES_CREABLES
+    tuple pour le formulaire admin : on n’y met pas ADMIN.
+
+  role = CharField(choices=...)
+    colonne « rôle » avec liste déroulante.
+
+  telephone, photo
+    photo = ImageField → il faut Pillow (dans requirements.txt).
+    blank=True, null=True : la photo n’est pas obligatoire.
+
+  Meta.ordering
+    tri par défaut dans l’admin et les listes.
+
+  __str__
+    ce que Python affiche si on print(user) ou dans l’admin.
+
+  is_admin / is_medecin / is_infirmier / is_receptionniste / is_soignant
+    raccourcis. is_soignant = médecin OU infirmier.
+    L’admin n’est PAS soignant : il n’a pas les boutons cliniques.
+
+class AuditLog
+  utilisateur : SET_NULL si on supprime le compte, on garde la ligne d’audit.
+  action : nom de la vue (ex. patients:creer) ou DECONNEXION.
+  created_at auto_now_add : date mise une seule fois à la création.
+  efface_le : vide = encore visible dans le journal 24 h.
+             rempli = masqué, mais la ligne existe toujours.
+  est_efface : propriété Python, pas une colonne. True si efface_le n’est pas None.
+
+
+8. accounts/permissions.py
+--------------------------
+RoleRequiredMixin hérite de LoginRequiredMixin + UserPassesTestMixin.
+  LoginRequired : pas connecté → page de connexion.
+  UserPassesTest : Django appelle test_func().
+
+allowed_roles = ()  attribut de classe, vide par défaut.
+
+test_func
+  False si pas connecté.
+  True si request.user.role est dans allowed_roles.
+  PAS de passe-droit admin (c’est volontaire).
+
+handle_no_permission
+  si déjà connecté → PermissionDenied → 403.
+  sinon → comportement normal (redirect login).
+
+Ensuite chaque mixin fixe allowed_roles :
+  AdminMixin          ADMIN
+  ReceptionMixin      RECEPTIONNISTE
+  InfirmierMixin      INFIRMIER
+  MedecinMixin        MEDECIN
+  SoignantMixin       MEDECIN + INFIRMIER
+  StaffDossierMixin   les 3 sauf ADMIN
+
+À l’oral : « On mixe la vue avec le bon mixin, Django refuse le reste. »
+
+
+9. accounts/audit.py
+--------------------
+client_ip
+  d’abord X-Forwarded-For (si un proxy), sinon REMOTE_ADDR.
+
+enregistrer_audit
+  ignore les anonymes.
+  path[:255] au cas où l’URL serait trop longue pour le CharField.
+
+masquer_commandes_expirees
+  seuil = maintenant moins 24 heures.
+  filter(efface_le__isnull=True, created_at__lt=seuil)
+    encore visibles ET trop vieilles
+  .update(efface_le=now)
+    UPDATE SQL, pas de DELETE. C’est ça « effacé mais pas supprimé ».
+
+
+10. accounts/middleware.py
+--------------------------
+__init__ stocke get_response (la suite de la chaîne Django).
+
+__call__(request)
+  1) masquer les commandes > 24 h
+  2) laisser la vue s’exécuter (get_response)
+  3) journaliser le POST si ça a marché
+  4) renvoyer la réponse
+
+_journaliser
+  on ignore GET (simple lecture).
+  on ignore les erreurs (status >= 400).
+  on ignore static/media et un gadget de l’admin Django.
+  action = "accounts:login" grâce à resolver_match (l’URL résolue).
+
+
+11. accounts/context_processors.py
+----------------------------------
+Fonctions qui reçoivent request et rendent un dict.
+Ce dict est fusionné dans le contexte de CHAQUE template.
+
+role_flags
+  is_admin_role, is_medecin_role… utilisés dans base.html
+  {% if is_reception_role %} pour afficher « Nouveau dossier ».
+
+structure
+  NOM_STRUCTURE lu dans settings, avec un défaut si jamais ça manque.
+  _request : le paramètre n’est pas utilisé (Django l’envoie quand même).
+
+
+12. accounts/forms.py
+---------------------
+StyledAuthenticationForm
+  AuthenticationForm = login Django.
+  On ajoute class="form-control" pour Bootstrap.
+
+UserCreateForm(UserCreationForm)
+  UserCreationForm gère password1 / password2 (saisie + confirmation).
+  Meta.fields = les champs visibles.
+  __init__ : role.choices = ROLES_CREABLES (pas ADMIN).
+
+UserUpdateForm
+  nouveau_mot_de_passe facultatif.
+  si instance.role == ADMIN : on désactive le champ rôle
+    (on ne dégrade pas l’admin par erreur).
+  save() : si un nouveau mot de passe est tapé, set_password le hash.
+
+ProfilPhotoForm
+  photo, téléphone, prénom, nom — pour « Mon profil ».
+
+BootstrapFormMixin (dans patients/forms.py, réutilisé ici)
+  boucle sur tous les champs et met form-control / form-select.
+
+
+13. accounts/views.py
+---------------------
+RoleLoginView(LoginView)
+  template_name = notre HTML de connexion.
+  authentication_form = le formulaire stylé.
+  redirect_authenticated_user = si déjà loggé, pas la peine de revoir le login.
+
+RoleLogoutView
+  Django 5 veut un POST pour se déconnecter (le bouton du menu est un <form>).
+  dispatch : on écrit l’audit AVANT super(), parce qu’après logout
+  request.user n’est plus authentifié.
+
+UserListView / Create / Update
+  AdminMixin → 403 pour les non-admin.
+  form_valid : message flash puis super() qui sauve.
+
+ProfilView
+  get_object retourne request.user : on ne peut modifier QUE soi-même.
+
+AuditListView
+  paginate_by = 30
+  get_queryset :
+    archives=1 → efface_le rempli (commandes masquées)
+    sinon → journal du jour (efface_le vide)
+    q → filtre Q(...) sur plusieurs colonnes
+  get_context_data ajoute archives et q pour le template (pagination).
+
+
+14. accounts/urls.py
+--------------------
+app_name = "accounts"
+  forcément pour {% url 'accounts:login' %}.
+
+path("connexion/", ..., name="login")
+  l’URL publique est en français, le name interne reste login
+  (parce que LOGIN_URL = "accounts:login" dans settings).
+
+<int:pk> = identifiant numérique dans l’URL.
+
+
+15. accounts/admin.py
+---------------------
+On étend UserAdmin de Django pour ajouter role, telephone, photo
+dans l’écran /admin/.
+AuditLogAdmin : champs en lecture seule (on ne trafique pas le journal).
+
+
+16. patients/models.py
+----------------------
+Genre / GroupeSanguin : listes fermées (pas de texte libre n’importe comment).
+
+numero_dossier
+  unique=True, editable=False : personne ne le tape, il est calculé.
+
+created_by
+  SET_NULL : si on supprime le réceptionniste, le dossier patient reste.
+
+indexes sur nom+prenom et numero_dossier : recherche plus rapide.
+
+age()
+  astuce classique : on soustrait 1 an si l’anniversaire n’est pas encore passé
+  cette année.  ((mois, jour) < (mois_naiss, jour_naiss)) vaut True/False,
+  et True vaut 1 en soustraction.
+
+save()
+  si pas encore de numéro → _generer_numero() puis super().save().
+
+_generer_numero (classmethod)
+  prefixe PAT-2026-
+  Max() sur les numéros de l’année
+  on prend le dernier XXXX, +1, formaté sur 4 chiffres : 0007, 0008…
+  unique=True en base protège si deux personnes enregistrent en même temps.
+
+
+17. patients/forms.py
+---------------------
+BootstrapFormMixin : déjà expliqué.
+
+PatientForm ModelForm
+  fields = tout sauf numero_dossier (généré tout seul).
+  DateInput type=date → calendrier du navigateur.
+
+PatientSearchForm
+  un seul champ q, pas lié à un modèle (forms.Form simple).
+
+
+18. patients/views.py
+---------------------
+PatientListView(StaffDossierMixin, ListView)
+  paginate_by = 12
+  get_queryset : si q, filtre nom OU prenom OU numero_dossier.
+  get_context_data : on renvoie aussi le formulaire de recherche.
+
+PatientDetailView
+  on précharge 8 constantes, 8 consultations, 8 RDV pour la fiche.
+
+PatientCreateView(ReceptionMixin)
+  form.instance.created_by = l’utilisateur connecté.
+
+PatientDeleteView
+  success_url = liste. CASCADE en base : supprimer un patient
+  enlève aussi ses consultations (à dire à l’oral : c’est voulu / attention).
+
+
+19. patients/urls.py
+--------------------
+""           liste
+nouveau/     création  (AVANT <pk> sinon « nouveau » serait un id)
+<pk>/        fiche
+modifier/    update
+supprimer/   delete
+
+
+20. consultations/models.py
+---------------------------
+Constante
+  patient CASCADE : si le patient part, ses constantes aussi.
+  pris_par SET_NULL : on garde la mesure même si l’infirmier est supprimé.
+  imc() : poids / (taille_en_mètres)². On convertit cm → m.
+
+Consultation
+  medecin (verbose « réalisé par ») : médecin OU infirmier selon qui saisit.
+  constante optionnelle (null=True, blank=True).
+
+Ordonnance
+  OneToOneField vers Consultation : une seule ordonnance par consult.
+  get_print_url : raccourci vers la page d’impression.
+
+RendezVous
+  Statut : planifié / honoré / annulé.
+  date_heure obligatoire.
+
+LigneOrdonnance
+  un médicament = une ligne. related_name="lignes"
+  → ordonnance.lignes.all() dans le template.
+
+
+21. consultations/forms.py
+--------------------------
+ConstanteForm / ConsultationForm : ModelForm + Bootstrap.
+
+ConsultationForm.__init__(patient=...)
+  queryset des constantes limitées à ce patient.
+  empty_label = « Aucune constante liée ».
+
+LigneOrdonnanceFormSet = inlineformset_factory(...)
+  extra=3 : 3 lignes vides
+  min_num=1, validate_min=True : au moins un médicament
+  can_delete=True : case « supprimer la ligne »
+
+RendezVousForm
+  datetime-local : widget HTML5.
+  Si on édite, on reformate la date en YYYY-MM-DDTHH:MM
+  (sinon le champ datetime-local reste vide).
+  Si on vient de la fiche patient : champ patient en HiddenInput.
+
+
+22. consultations/views.py
+--------------------------
+PatientKwargMixin
+  get_patient() lit patient_pk dans l’URL.
+
+ConstanteCreateView(InfirmierMixin)
+  form_valid : patient + pris_par = user connecté.
+
+ConsultationCreateView(SoignantMixin)
+  get_form_kwargs : on passe patient au formulaire (pour filtrer les constantes).
+  get_success_url :
+    médecin → page ordonnance
+    infirmier → simple détail (pas le droit de prescrire)
+
+OrdonnanceUpdateView(MedecinMixin)
+  fields = [] : on n’édite pas la consultation, seulement le formset.
+  get_or_create : crée l’ordonnance vide si elle n’existe pas encore.
+  post() : valide le formset, sauve les lignes.
+
+OrdonnancePrintView
+  template sans le menu (CSS @media print).
+
+RendezVous* : MedecinMixin partout.
+  Create : medecin = request.user.
+
+
+23. consultations/urls.py
+-------------------------
+L’ordre compte :
+  rendez-vous/  d’abord
+  <int:pk>/     ensuite
+Sinon l’URL /consultations/rendez-vous/ essaierait de convertir
+« rendez-vous » en entier → erreur.
+
+
+24. reports/views.py
+--------------------
+DashboardView(LoginRequiredMixin) : tout le monde connecté y a droit,
+y compris l’admin (contrairement aux pages patients).
+
+get_context_data
+  aujourd_hui = date locale
+  debut / fin = minuit → minuit+1 jour, pour filtrer « aujourd’hui »
+  make_aware : SQLite + USE_TZ, il faut une datetime « timezone aware »
+
+  consultations_du_jour, constantes_du_jour, patients_total : compteurs
+  bar_total = max(..., 1) pour ne pas diviser par 0 dans le template
+              (filtre widthratio)
+
+  genre_counts : GROUP BY genre
+  next(..., 0) : si aucun homme, on affiche 0 pas une erreur
+
+  boucle ages : on calcule les tranches en Python
+  (volume d’un poste local, pas des millions de lignes)
+
+  is_reception_home / is_admin_home : le HTML affiche un bloc différent
+  admin : extraits d’audit
+  médecin : RDV à venir
+
+
+25. templates (idée générale, pas ligne à ligne HTML)
+-----------------------------------------------------
+base.html
+  page « chapeau ». {% block content %} est remplacé par chaque page.
+  Menu selon is_*_role.
+  Photo : si user.photo on affiche l’image, sinon l’initiale.
+  Logout = <form method="post"> + {% csrf_token %} (obligatoire Django 5).
+
+login.html
+  même CSS que le reste (app.css).
+  Colonne gauche = même dégradé que la sidebar.
+  Carte blanche = même classe stat-card que le dashboard.
+  Bouton btn-success = même vert #0f766e.
+
+Les formulaires : {% csrf_token %} dans chaque <form method="post">.
+enctype="multipart/form-data" dès qu’il y a un champ photo.
+
+ordonnance_print.html
+  page à part, bouton Imprimer, @media print cache le bouton.
+
+
+26. static/css/app.css
+----------------------
+:root  variables : --hc-teal #0f766e, fond --hc-bg #f1f5f4
+  (gris légèrement vert, pas un gris froid)
+
+.btn-success forcé en teal pour coller au bandeau
+.sidebar et .login-bandeau : le MÊME linear-gradient
+.stat-card : cartes blanches arrondies, légère ombre
+.login-page : fond identique à .app-body
+@media print : .no-print { display:none }
+
+
+27. seed_data.py et populate_db.py
+----------------------------------
+python manage.py seed_data
+  Command(BaseCommand) : commande personnalisée Django.
+
+handle()
+  crée/met à jour admin, medecin, infirmier, reception
+  set_password hash le mot de passe (on ne stocke jamais le texte clair)
+  si des patients existent déjà, on ne les recrée pas
+  idem consultations
+  ensuite RDV de démo + une ligne d’audit déjà « effacée » (pour tester
+  le bouton « retrouver les commandes effacées »)
+
+populate_db.py
+  django.setup() puis call_command("seed_data")
+  même chose sans passer par manage.py
+
+
+28. CE QU’ON PEUT DIRE À L’ORAL (phrases toutes faites)
+-------------------------------------------------------
+« Le projet est en 4 applis Django pour séparer comptes, patients,
+  soins et statistiques. »
+
+« Les droits passent par des mixins : l’admin gère le personnel et
+  l’audit, la réception les dossiers, l’infirmier les constantes et
+  les consultations, le médecin les RDV et les ordonnances. »
+
+« L’audit n’est pas un DELETE : au bout de 24 h on remplit efface_le.
+  L’admin filtre sur ce champ pour voir l’historique masqué. »
+
+« Le numéro de dossier est calculé dans Patient.save, format PAT-année-compteur. »
+
+« SQLite + runserver, c’est du offline-first / LAN. En ligne il faudrait
+  DEBUG=False, HTTPS, et plutôt PostgreSQL. »
+
+
+29. FICHIERS QU’ON N’EXPLIQUE PAS LIGNE À LIGNE
+-----------------------------------------------
+accounts/migrations/*.py
+patients/migrations/*.py
+consultations/migrations/*.py
+  Django les écrit tout seul avec makemigrations. Tu dis :
+  « ce sont les instructions SQL générées à partir des models. »
+
+.venv/  environnement Python, pas notre code.
+db.sqlite3  la base, pas du code.
+
+
+30. POUR RELANCER LE PROJET
+---------------------------
+cd vers le dossier
+.\.venv\Scripts\Activate.ps1
+python manage.py runserver
+
+Comptes :
+  admin / Admin123!
+  medecin / Medecin123!
+  infirmier / Infirmier123!
+  reception / Reception123!

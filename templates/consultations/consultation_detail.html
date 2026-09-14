@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Consultation {{ consultation.pk }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <div>
+    <h1 class="h3 mb-0">Consultation du {{ consultation.date_consultation|date:"d/m/Y à H:i" }}</h1>
+    <p class="text-secondary mb-0">
+      <a href="{{ consultation.patient.get_absolute_url }}">{{ consultation.patient }}</a>
+      · {{ consultation.medecin.get_full_name|default:consultation.medecin }}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if is_medecin_role %}
+      <a class="btn btn-outline-success" href="{% url 'consultations:ordonnance' consultation.pk %}">Ordonnance</a>
+      <a class="btn btn-success" href="{% url 'consultations:ordonnance_imprimer' consultation.pk %}">Imprimer</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card stat-card card-body">
+      <p><strong>Motif</strong><br>{{ consultation.motif }}</p>
+      <p><strong>Symptômes</strong><br>{{ consultation.symptomes|default:"—" }}</p>
+      <p><strong>Diagnostic</strong><br>{{ consultation.diagnostic }}</p>
+      <p class="mb-0"><strong>Conduite à tenir</strong><br>{{ consultation.conduite_a_tenir|default:"—" }}</p>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card stat-card card-body">
+      <h2 class="h6">Constantes liées</h2>
+      {% if consultation.constante %}
+        <ul class="list-unstyled mb-0">
+          <li>TA : {{ consultation.constante.tension_arterielle }}</li>
+          <li>T° : {{ consultation.constante.temperature }} °C</li>
+          <li>Poids : {{ consultation.constante.poids }} kg</li>
+          <li>Taille : {{ consultation.constante.taille }} cm</li>
+          <li>FC : {{ consultation.constante.frequence_cardiaque }} bpm</li>
+        </ul>
+      {% else %}
+        <p class="text-secondary mb-0">Aucune constante associée.</p>
+      {% endif %}
+    </div>
+    {% if consultation.ordonnance %}
+    <div class="card stat-card card-body mt-3">
+      <h2 class="h6">Prescription</h2>
+      <ul>
+        {% for ligne in consultation.ordonnance.lignes.all %}
+          <li>{{ ligne.medicament_nom }} — {{ ligne.posologie }} ({{ ligne.duree_traitement }})</li>
+        {% empty %}
+          <li class="text-secondary">Lignes à compléter</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

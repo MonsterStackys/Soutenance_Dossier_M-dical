@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3 mb-0">Tableau de bord</h1>
+    <p class="text-secondary mb-0">{{ aujourdhui|date:"l j F Y" }} — activité du poste</p>
+  </div>
+  <div class="d-flex gap-2">
+  {% if is_admin_home %}
+    <a class="btn btn-success" href="{% url 'accounts:utilisateur_creer' %}">Ajouter un utilisateur</a>
+    <a class="btn btn-outline-success" href="{% url 'accounts:audit' %}">Voir l'audit</a>
+  {% elif is_reception_role %}
+    <a class="btn btn-success" href="{% url 'patients:creer' %}"><i class="bi bi-person-plus me-1"></i>Enregistrer un patient</a>
+  {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card stat-card p-3">
+      <div class="text-secondary small">Consultations du jour</div>
+      <div class="display-6 fw-semibold">{{ consultations_du_jour }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card stat-card p-3">
+      <div class="text-secondary small">Constantes du jour</div>
+      <div class="display-6 fw-semibold">{{ constantes_du_jour }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card stat-card p-3">
+      <div class="text-secondary small">Dossiers patients</div>
+      <div class="display-6 fw-semibold">{{ patients_total }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card stat-card p-3">
+      <div class="text-secondary small">Répartition genre</div>
+      <div class="fs-4 fw-semibold">{{ nb_femmes }} F · {{ nb_hommes }} H</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-5">
+    <div class="card stat-card">
+      <div class="card-body">
+        <h2 class="h6">Répartition par âge</h2>
+        {% for label, n in tranches_age.items %}
+          <div class="d-flex justify-content-between mb-1">
+            <span>{{ label }} ans</span><strong>{{ n }}</strong>
+          </div>
+          <div class="progress mb-2" style="height:8px">
+            <div class="progress-bar bg-success" style="width:{% widthratio n bar_total 100 %}%"></div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card stat-card">
+      <div class="card-body">
+        {% if is_admin_home %}
+          <h2 class="h6">Commandes du journal (24 h) — {{ audits_jour_count }}</h2>
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <thead><tr><th>Heure</th><th>Utilisateur</th><th>Action</th></tr></thead>
+              <tbody>
+              {% for e in audits_jour %}
+                <tr>
+                  <td>{{ e.created_at|date:"H:i" }}</td>
+                  <td>{{ e.utilisateur|default:"—" }}</td>
+                  <td class="small"><code>{{ e.action }}</code></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="3" class="text-secondary">Aucune commande récente.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <a href="{% url 'accounts:audit' %}?archives=1">Retrouver les commandes déjà effacées</a>
+        {% elif is_reception_home %}
+          <h2 class="h6">Derniers dossiers enregistrés</h2>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>N°</th><th>Patient</th><th>Téléphone</th></tr></thead>
+              <tbody>
+              {% for p in patients_recents %}
+                <tr>
+                  <td><a href="{{ p.get_absolute_url }}">{{ p.numero_dossier }}</a></td>
+                  <td>{{ p.nom }} {{ p.prenom }}</td>
+                  <td>{{ p.telephone }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="3" class="text-secondary">Aucun patient.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <h2 class="h6">Consultations du jour</h2>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>Heure</th><th>Patient</th><th>Motif</th><th></th></tr></thead>
+              <tbody>
+              {% for c in consultations_recentes %}
+                <tr>
+                  <td>{{ c.date_consultation|date:"H:i" }}</td>
+                  <td>{{ c.patient.nom }} {{ c.patient.prenom }}</td>
+                  <td>{{ c.motif }}</td>
+                  <td><a href="{% url 'consultations:detail' c.pk %}">Ouvrir</a></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-secondary">Aucune consultation aujourd'hui.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not is_admin_home %}
+<div class="card stat-card">
+  <div class="card-body">
+    <h2 class="h6">Constantes récentes</h2>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Date</th><th>Patient</th><th>TA</th><th>T°</th><th>FC</th><th>IMC</th><th>Pris par</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for k in constantes_recentes %}
+          <tr>
+            <td>{{ k.date|date:"d/m/Y H:i" }}</td>
+            <td><a href="{{ k.patient.get_absolute_url }}">{{ k.patient }}</a></td>
+            <td>{{ k.tension_arterielle }}</td>
+            <td>{{ k.temperature }} °C</td>
+            <td>{{ k.frequence_cardiaque }}</td>
+            <td>{% if k.imc %}{{ k.imc }}{% else %}—{% endif %}</td>
+            <td>{{ k.pris_par.get_full_name|default:k.pris_par }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-secondary">Pas encore de constantes.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

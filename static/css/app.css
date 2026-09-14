@@ -1,0 +1,127 @@
+:root {
+  --hc-teal: #0f766e;
+  --hc-teal-dark: #115e59;
+  --hc-teal-deep: #134e4a;
+  --hc-ink: #0f172a;
+  --hc-muted: #64748b;
+  --hc-bg: #f1f5f4;
+}
+
+html, body { height: 100%; }
+
+body.app-body {
+  background: var(--hc-bg);
+  color: var(--hc-ink);
+}
+
+/* Même vert que le menu, pour que les boutons collent au bandeau */
+.btn-success {
+  background-color: var(--hc-teal);
+  border-color: var(--hc-teal-dark);
+}
+.btn-success:hover,
+.btn-success:focus {
+  background-color: var(--hc-teal-dark);
+  border-color: var(--hc-teal-deep);
+}
+.btn-outline-success {
+  color: var(--hc-teal);
+  border-color: var(--hc-teal);
+}
+.btn-outline-success:hover {
+  background-color: var(--hc-teal);
+  border-color: var(--hc-teal);
+  color: #fff;
+}
+.text-success {
+  color: var(--hc-teal) !important;
+}
+
+.sidebar {
+  width: 260px;
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--hc-teal-deep) 0%, var(--hc-teal) 55%, var(--hc-teal-dark) 100%);
+}
+
+.sidebar .brand {
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+.sidebar .nav-link {
+  color: rgba(255,255,255,.82);
+  border-radius: .6rem;
+  padding: .55rem .85rem;
+}
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+  background: rgba(255,255,255,.12);
+  color: #fff;
+}
+
+.stat-card {
+  border: 0;
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+  background: #fff;
+}
+
+.table thead th {
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--hc-muted);
+}
+
+.badge-role {
+  font-weight: 600;
+}
+
+/* Page login : même fond gris-vert + même bandeau que le logiciel */
+.login-page {
+  min-height: 100vh;
+  background: var(--hc-bg);
+  color: var(--hc-ink);
+}
+
+.login-layout {
+  min-height: 100vh;
+}
+
+.login-bandeau {
+  background: linear-gradient(180deg, var(--hc-teal-deep) 0%, var(--hc-teal) 55%, var(--hc-teal-dark) 100%);
+}
+
+.login-brand-icon {
+  background: #fff;
+  color: var(--hc-teal);
+  border-radius: .75rem;
+  padding: .65rem .8rem;
+  display: inline-flex;
+}
+
+.login-page .input-group .form-control:focus {
+  z-index: 3;
+}
+
+.avatar-profil {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255,255,255,.45);
+  flex-shrink: 0;
+}
+.avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #99f6e4;
+  color: var(--hc-teal-deep);
+  font-weight: 700;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+}

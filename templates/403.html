@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Accès refusé{% endblock %}
+{% block content %}
+<div class="card stat-card card-body">
+  <h1 class="h4">Accès refusé</h1>
+  <p>Votre rôle ({{ request.user.get_role_display }}) ne permet pas d'effectuer cette action.</p>
+  <a class="btn btn-success" href="{% url 'reports:dashboard' %}">Retour au tableau de bord</a>
+</div>
+{% endblock %}

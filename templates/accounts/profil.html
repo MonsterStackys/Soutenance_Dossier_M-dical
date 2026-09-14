@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Mon profil{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Mon profil</h1>
+<div class="card stat-card card-body" style="max-width: 560px">
+  <div class="d-flex align-items-center gap-3 mb-4">
+    {% if request.user.photo %}
+      <img src="{{ request.user.photo.url }}" alt="Photo de profil" class="avatar-profil" style="width:72px;height:72px;border-color:#0f766e">
+    {% else %}
+      <span class="avatar-profil avatar-fallback" style="width:72px;height:72px;font-size:1.5rem">{{ request.user.username|slice:":1"|upper }}</span>
+    {% endif %}
+    <div>
+      <div class="fw-semibold">{{ request.user.get_full_name|default:request.user.username }}</div>
+      <div class="text-secondary">{{ request.user.get_role_display }}</div>
+    </div>
+  </div>
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="mb-3">
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+      </div>
+    {% endfor %}
+    <button class="btn btn-success" type="submit">Mettre à jour</button>
+  </form>
+</div>
+{% endblock %}

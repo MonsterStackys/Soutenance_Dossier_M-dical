@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Ordonnance{% endblock %}
+{% block content %}
+<h1 class="h3">Ordonnance — {{ patient.nom }} {{ patient.prenom }}</h1>
+<p class="text-secondary">Consultation du {{ consultation.date_consultation|date:"d/m/Y" }}</p>
+<form method="post" class="card stat-card card-body">
+  {% csrf_token %}
+  {{ formset.management_form }}
+  {% if formset.non_form_errors %}
+    <div class="alert alert-danger">{{ formset.non_form_errors }}</div>
+  {% endif %}
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Médicament</th>
+          <th>Posologie</th>
+          <th>Durée</th>
+          <th>Suppr.</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for f in formset %}
+        <tr>
+          <td>
+            {% for hidden in f.hidden_fields %}{{ hidden }}{% endfor %}
+            {{ f.medicament_nom }}
+            {{ f.medicament_nom.errors }}
+          </td>
+          <td>{{ f.posologie }}{{ f.posologie.errors }}</td>
+          <td>{{ f.duree_traitement }}{{ f.duree_traitement.errors }}</td>
+          <td>{% if f.DELETE %}{{ f.DELETE }}{% endif %}{{ f.errors }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <button class="btn btn-success" type="submit">Enregistrer l'ordonnance</button>
+  <a class="btn btn-outline-secondary" href="{% url 'consultations:detail' consultation.pk %}">Retour</a>
+</form>
+{% endblock %}
