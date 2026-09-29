@@ -72,7 +72,7 @@ DATABASES = {
     }
 }
 
-# Obligatoire dès qu'on étend AbstractUser (avant la 1re migrate)
+# Obligatoire dès qu'on étend AbstractUser (avant la 1re migration)
 AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -83,7 +83,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "fr-fr"
-TIME_ZONE = "Africa/Abidjan"
+TIME_ZONE = "Africa/Dakar"
 USE_I18N = True
 USE_TZ = True
 
