@@ -12,7 +12,7 @@ SECRET_KEY = "django-insecure-health-centre-licence-demo-change-me"
 DEBUG = True  # pratique en soutenance, à couper en production
 
 # * = on peut ouvrir l'app depuis un autre PC du réseau local
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "192.168.1.9"]
 
 NOM_STRUCTURE = "Poste de Santé Khar Yalla"
 
@@ -108,7 +108,7 @@ CSRF_COOKIE_HTTPONLY = True
 # Si on ouvre l'app en http://192.168.x.x:8000, il faudra ajouter cette origine ici
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
-    "http://127.0.0.1:8000",
+    "http://192.168.1.9:8000",
 ]
 
 # Pour que les messages Django collent aux classes Bootstrap (error -> danger)
