@@ -2,6 +2,7 @@
 {% block title %}Consultation {{ consultation.pk }}{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between mb-3">
+  <!-- Notifier la date de la consultation -->
   <div>
     <h1 class="h3 mb-0">Consultation du {{ consultation.date_consultation|date:"d/m/Y à H:i" }}</h1>
     <p class="text-secondary mb-0">
